@@ -12,7 +12,6 @@ op_stack : .word 0
 .text
 .globl main
 main:
-	# add code to call and is_digit 
 	li $a0, '^'
   	jal valid_ops
   

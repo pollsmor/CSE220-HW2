@@ -11,15 +11,14 @@ op_stack : .word 0
 .text
 .globl main
 main:
-  # add code to call and is_digit 
-  li $a0, '0'
-  jal is_digit
+	li $a0, '0'
+  	jal is_digit
   
-  move $a0, $v0
-  li $v0, 1
-  syscall
+  	move $a0, $v0
+  	li $v0, 1
+ 	syscall
   
-  j end
+	j end
 
 end:
   # Terminates the program

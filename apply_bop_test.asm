@@ -11,8 +11,16 @@ op_stack : .word 0
 .text
 .globl main
 main:
-
-  # add code to test call and test apply_bop function
+	li $a0, 5
+	li $a1, '/'
+	li $a2, -2
+  	jal apply_bop
+  	
+  	move $a0, $v0
+  	li $v0, 1
+  	syscall
+  
+  j end
 
 end:
   # Terminates the program

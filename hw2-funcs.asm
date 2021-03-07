@@ -73,13 +73,7 @@ op_precedence:
 		j return_op_precedence
 
 	invalid_op:
-		li $v0, 4
-		la $a0, ApplyOpError
-		syscall
-		li $v0, 4
-		la $a0, Newline
-		syscall
-		li $v0, -1		# Invalid operator return value of -1
+		j applyoperror_msg
 		
 	return_op_precedence:
 		lw $ra, 0($sp)		# Restore $ra
@@ -87,4 +81,48 @@ op_precedence:
 		jr $ra
 
 apply_bop:
-  jr $ra
+	li $t0, '+'
+	beq $v1, $t0, addition		
+	li $t0, '-'
+	beq $v1, $t0, subtraction	
+	li $t0, '*'
+	beq $v1, $t0, multiplication	
+	
+	# Last valid operation is division
+	beq $a2, $0, dividebyzero	# Can't divide by 0
+	bgez $a2, skip_sign_swap	# The way I handle floor division requires the first arg to be (+)
+	li $t0, -1			# Swap signs of first arg to (+), balance it by swapping second arg
+	mult $a0, $t0
+	mflo $a0
+	mult $a2, $t0
+	mflo $a2
+	skip_sign_swap:
+		div $a0, $a2
+	
+	mflo $v0			# Get quotient
+	mfhi $t0			# Get remainder - for cases like -1/2 where you want -1, not 0
+	bgez $t0, return_apply_bop
+	addi $v0, $v0, -1		# For the aforementioned case like -1/2
+	
+	return_apply_bop:
+		j return_bop_result
+	
+	addition:
+		j return_bop_result
+	subtraction:
+		j return_bop_result
+	multiplication:
+		j return_bop_result
+	
+	return_bop_result:
+		jr $ra
+	dividebyzero:
+		j applyoperror_msg
+	
+applyoperror_msg:
+	li $v0, 4
+	la $a0, ApplyOpError
+	syscall
+	
+	li $v0, 10
+	syscall
