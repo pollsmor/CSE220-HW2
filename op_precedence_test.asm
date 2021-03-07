@@ -12,8 +12,15 @@ op_stack : .word 0
 .text
 .globl main
 main:
-
-  # add code to call and test op_precedence function
+	# add code to call and is_digit 
+	li $a0, '/'
+  	jal op_precedence
+  
+  	move $a0, $v0
+  	li $v0, 1
+  	syscall
+  
+  j end
 
 end:
   # Terminates the program

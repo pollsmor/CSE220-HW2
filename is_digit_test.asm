@@ -12,7 +12,7 @@ op_stack : .word 0
 .globl main
 main:
   # add code to call and is_digit 
-  li $a0, ':'
+  li $a0, '0'
   jal is_digit
   
   move $a0, $v0
