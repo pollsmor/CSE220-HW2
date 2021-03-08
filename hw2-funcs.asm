@@ -35,7 +35,12 @@ stack_push:
 	stackTooLarge:
 		j badTokenError
 
+# Basically a carbon copy of stack_pop's body
 stack_peek:
+	blt $a0, $0, emptyStackError 
+	
+	add $t0, $a1, $a0		
+	lw $v0, 0($t0)
 	jr $ra	
 
 stack_pop:
@@ -48,7 +53,12 @@ stack_pop:
 		j badTokenError
 
 is_stack_empty:
-  jr $ra
+	blt $a0, $0, emptyStack
+	li $v0, 0
+	jr $ra
+	emptyStack:
+		li $v0, 1
+		jr $ra
 
 valid_ops:
 	li $v0, 0	# Assume character is invalid initially

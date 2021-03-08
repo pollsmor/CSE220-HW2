@@ -25,8 +25,10 @@ main:
 	syscall
 	
 	# Print value at top of stack
-	la $s0, val_stack
-	lw $a0, 0($s0)
+	li $a0, 0		# 0-3 is the first element
+	la $a1, val_stack
+	jal stack_peek
+	move $a0, $v0
 	li $v0, 1
 	syscall
 	
@@ -46,7 +48,21 @@ main:
 	la $a0, Newline
 	syscall
 	
-	lw $a0, 4($s0)
+	li $a0, 4		# 4-7 is the second element
+	la $a1, val_stack
+	jal stack_peek
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $v0, 4
+	la $a0, Newline
+	syscall
+	# ====================================
+	# Check if stack is empty (hint: no)
+	li $a0, 8
+	jal is_stack_empty
+	move $a0, $v0
 	li $v0, 1
 	syscall
 	
@@ -78,6 +94,18 @@ main:
 	la $a0, Newline
 	syscall
 	# ====================================
+	# Check if stack is empty (hint: yes)
+	li $a0, -4
+	jal is_stack_empty
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $v0, 4
+	la $a0, Newline
+	syscall
+	# ====================================
+	
 	li $a0, -4	# Should error out. (0 - 4)
 	la $a1, val_stack
 	jal stack_pop

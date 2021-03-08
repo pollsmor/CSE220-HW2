@@ -12,8 +12,8 @@ op_stack : .word 0
 .text
 .globl main
 main:
-
   # add code to call and test test stack_peek function
+  # see stack_push_test.asm
 
 end:
   # Terminates the program
