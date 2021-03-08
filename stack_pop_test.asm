@@ -15,6 +15,7 @@ op_stack : .word 0
 main:
 
   # add code to call and test stack_pop function
+  # see stack_push_test.asm
 
 end:
   # Terminates the program

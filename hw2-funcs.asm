@@ -33,18 +33,19 @@ stack_push:
 	addi $v0, $a1, 4		# Size of element is 4, so return top + 4
 	jr $ra
 	stackTooLarge:
-		li $v0, 4
-		la $a0, BadToken
-		syscall
-		
-		li $v0, 10
-		syscall
+		j badTokenError
 
 stack_peek:
-  jr $ra
+	jr $ra	
 
 stack_pop:
-  jr $ra
+	blt $a0, $0, emptyStackError	# $tp cannot be < 0 (i.e. caller provides -4)
+	
+	add $t0, $a1, $a0		# Add tp to base address
+	lw $v1, 0($t0)			# $v0 stays the same, return popped element in $v1
+	jr $ra
+	emptyStackError:
+		j badTokenError
 
 is_stack_empty:
   jr $ra
@@ -143,5 +144,13 @@ applyoperror_msg:
 	la $a0, ApplyOpError
 	syscall
 	
+	li $v0, 10
+	syscall
+	
+badTokenError:
+	li $v0, 4
+	la $a0, BadToken
+	syscall
+		
 	li $v0, 10
 	syscall
