@@ -25,7 +25,20 @@ is_digit:
   		jr $ra
 
 stack_push:
-  jr $ra
+	li $t0, 2000			# 500 * 4
+	bge $a1, $t0, stackTooLarge	# Stack will pass 500 elements, so error out
+	add $t0, $a2, $a1		# Add tp ($a1) to base address ($a2) and store in $t0
+	sw $a0, 0($t0)
+
+	addi $v0, $a1, 4		# Size of element is 4, so return top + 4
+	jr $ra
+	stackTooLarge:
+		li $v0, 4
+		la $a0, BadToken
+		syscall
+		
+		li $v0, 10
+		syscall
 
 stack_peek:
   jr $ra

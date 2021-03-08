@@ -11,9 +11,45 @@ op_stack : .word 0
 .text
 .globl main
 main:
-
-  # add code to call and test stack_push function
-
+	li $a0, 69000
+	li $a1, 0
+	la $a2, val_stack
+	jal stack_push
+	
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	li $v0, 4
+	la $a0, Newline
+	syscall
+	
+	la $s0, val_stack
+	lw $s1, 0($s0)
+	move $a0, $s1
+	li $v0, 1
+	syscall
+	
+	li $v0, 4
+	la $a0, Newline
+	syscall
+	# ====================================
+	li $a0, 1337
+	li $a1, 1996
+	la $a2, val_stack
+	jal stack_push
+	
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	li $v0, 4
+	la $a0, Newline
+	syscall
+	
+	la $s0, val_stack
+	lw $s1, 1996($s0)
+	move $a0, $s1
+	li $v0, 1
+	syscall
 end:
   # Terminates the program
   li $v0, 10
