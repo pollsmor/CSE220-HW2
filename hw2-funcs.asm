@@ -6,7 +6,9 @@
 
 .text
 eval:
-  jr $ra
+	
+
+	jr $ra
 
 is_digit:
 	li $v0, 0	# Assume character isn't digit initially

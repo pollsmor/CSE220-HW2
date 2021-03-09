@@ -35,6 +35,43 @@ main:
 	li $v0, 4
 	la $a0, Newline
 	syscall
+	# Push operators onto another stack, verify stacks do not overlap
+	li $a0, '+'		# value to be pushed
+	li $a1, 0		# tp
+	la $a2, op_stack	# Base address of stack
+	jal stack_push
+	
+	li $a0, '-'		# value to be pushed
+	li $a1, 4		# tp
+	la $a2, op_stack	# Base address of stack
+	jal stack_push
+	
+	li $a0, '*'		# value to be pushed
+	li $a1, 8		# tp
+	la $a2, op_stack	# Base address of stack
+	jal stack_push
+	
+	li $a0, 0		# Should contain 69000 instead of '+'
+	la $a1, val_stack
+	jal stack_peek
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $v0, 4
+	la $a0, Newline
+	syscall
+	
+	li $a0, 0		# Should contain '+' instead of 69000
+	la $a1, op_stack
+	jal stack_peek
+	move $a0, $v0
+	li $v0, 11
+	syscall
+	
+	li $v0, 4
+	la $a0, Newline
+	syscall
 	# ====================================
 	li $a0, 1337
 	li $a1, 4
