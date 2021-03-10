@@ -19,6 +19,8 @@ eval: # (string AExp)
 		addi $sp, $sp, 4
 		bne $v0, $0, digitFound	# is_digit returned 1, jump ahead and add to value stack
 		
+		j advanceLoop
+		
 		digitFound:	# Find additional digits (if any), then push to val_stack
 			addi $sp, $sp, -4
 			sw $ra, 0($sp)
