@@ -5,12 +5,12 @@
 ############################## Do not .include any files! #############################
 
 .text
-eval:
-	
-
+eval: # (string aexp)
 	jr $ra
 
-is_digit:
+
+
+is_digit: # (char c)
 	li $v0, 0	# Assume character isn't digit initially
 	li $t0, '0'
 	li $t1, 58	# ASCII value 1 above '9'
@@ -26,7 +26,13 @@ is_digit:
 		li $v0, 1
   		jr $ra
 
-stack_push:
+stack_push: # (int x, int tp, int* addr)
+	la $t0, op_stack
+	bne $t0, $a2, skipOffsetPush	# Check that the base address is op_stack or val_stack
+	# op_stack must be > 2000 bytes higher in address to prevent overlapping with val_stack
+	addi $a2, $a2, 2000		
+
+	skipOffsetPush:
 	li $t0, 2000			# 500 * 4
 	bge $a1, $t0, stackTooLarge	# Stack will pass 500 elements, so error out
 	add $t0, $a2, $a1		# Add tp ($a1) to base address ($a2) and store in $t0
@@ -38,23 +44,33 @@ stack_push:
 		j badTokenError
 
 # Basically a carbon copy of stack_pop's body
-stack_peek:
+stack_peek: # (int tp, int* addr)
 	blt $a0, $0, emptyStackError 
+	la $t0, op_stack
+	bne $t0, $a1, skipOffsetPeek	# Check that the base address is op_stack or val_stack
+	# op_stack must be > 2000 bytes higher in address to prevent overlapping with val_stack
+	addi $a1, $a1, 2000	
 	
+	skipOffsetPeek:
 	add $t0, $a1, $a0		
 	lw $v0, 0($t0)
 	jr $ra	
 
-stack_pop:
+stack_pop: # (int tp, int* addr)
 	blt $a0, $0, emptyStackError	# $tp cannot be < 0 (i.e. caller provides -4)
+	la $t0, op_stack
+	bne $t0, $a1, skipOffsetPop	# Check that the base address is op_stack or val_stack
+	# op_stack must be > 2000 bytes higher in address to prevent overlapping with val_stack
+	addi $a1, $a1, 2000	
 	
+	skipOffsetPop:
 	add $t0, $a1, $a0		# Add tp to base address
 	lw $v1, 0($t0)			# $v0 stays the same, return popped element in $v1
 	jr $ra
 	emptyStackError:
 		j badTokenError
 
-is_stack_empty:
+is_stack_empty: # (int tp)
 	blt $a0, $0, emptyStack
 	li $v0, 0
 	jr $ra
@@ -62,7 +78,7 @@ is_stack_empty:
 		li $v0, 1
 		jr $ra
 
-valid_ops:
+valid_ops: # (char c)
 	li $v0, 0	# Assume character is invalid initially
 	
 	li $t0, '+'
@@ -79,7 +95,7 @@ valid_ops:
 		li $v0, 1
 		jr $ra
 
-op_precedence:
+op_precedence: # (char c)
 	addi $sp, $sp, -4	# Save $ra as I will be calling a secondary function
 	sw $ra, 0($sp)
 	
@@ -106,7 +122,7 @@ op_precedence:
 		addi $sp, $sp, 4
 		jr $ra
 
-apply_bop:
+apply_bop: # (int v1, char op, int v2)
 	li $t0, '+'
 	beq $a1, $t0, addition		
 	li $t0, '-'
