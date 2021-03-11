@@ -8,47 +8,290 @@
 eval: # (string AExp)
 	lw $s0, 0($a1)		# Load AExp
 	lbu $s1, 0($s0)		# Load one character from AExp, use $s1 as $t0 would just get overwritten
-	li $s2, 0		# Use $s2 as tp argument
+	li $s2, 0		# Use $s2 as tp argument for val_stack
+	li $s3, 0		# Use $s2 as tp argument for op_stack
+
 	iterateAExp:
-		# Check if character is a digit
-		addi $sp, $sp, -4	# Save $ra as I will be calling a secondary function
+	# Check if character is a digit
+	addi $sp, $sp, -4	# Save $ra as I will be calling a secondary function
+	sw $ra, 0($sp)
+	move $a0, $s1		# Make first argument of is_digit the character
+	jal is_digit
+	lw $ra, 0($sp)		# Restore $ra
+	addi $sp, $sp, 4
+	bne $v0, $0, digitFound
+
+	# Check if character is an operator
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	move $a0, $s1
+	jal valid_ops
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	bne $v0, $0, operatorFound
+	
+	# Check if character is left parentheses
+	li $t0, '('
+	beq $s1, $t0, leftParensFound
+	
+	# Check if character is right parentheses
+	li $t0, ')'
+	beq $s1, $t0, rightParensFound
+	
+	j badTokenError 		# Character is invalid
+	
+	digitFound:	# Find additional digits (if any), then push to val_stack
+		addi $sp, $sp, -4
 		sw $ra, 0($sp)
-		move $a0, $s1		# Make first argument of is_digit the character
-		jal is_digit
-		lw $ra, 0($sp)		# Restore $ra
+		move $a0, $s0
+		jal constructOperand
+		lw $ra, 0($sp)
 		addi $sp, $sp, 4
-		bne $v0, $0, digitFound	# is_digit returned 1, jump ahead and add to value stack
+		addi $v1, $v1, -1		# Advance AExp by (n - 1), n being length of val
+		add $s0, $s0, $v1
+		
+		# Push val to stack
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		move $a0, $v0
+		move $a1, $s2			# $s2 contains tp of val_stack
+		la $a2, val_stack
+		jal stack_push
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s2, $v0			# Update tp of val_stack
 		
 		j advanceLoop
+
+	operatorFound: 
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		addi $a0, $s3, -4		# Pass tp - 4 to is_stack_empty
+		jal is_stack_empty
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
 		
-		digitFound:	# Find additional digits (if any), then push to val_stack
+		bne $v0, $0, pushOp		# If op_stack is empty, simply push to it		
+		loopThroughOpStack:		# Otherwise...				
 			addi $sp, $sp, -4
 			sw $ra, 0($sp)
-			move $a0, $s0
-			jal constructOperand
+			move $a0, $s1
+			jal op_precedence
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4
+			move $s4, $v0		# $s4 now contains precedence of current character
+			
+			addi $sp, $sp, -4
+			sw $ra, 0($sp)
+			addi $a0, $s3, -4	# Peek at op_stack
+			la $a1, op_stack
+			jal stack_peek
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4
+			addi $sp, $sp, -4	# I'm calling another function right after the last one.
+			sw $ra, 0($sp)
+			move $a0, $v0		# $v0 contains the peeked operator
+			jal op_precedence
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4
+			move $s5, $v0		# $s5 now contains precedence of the operator on stack		
+																				
+			blt $s5, $s4, pushOp	# Operator stack's operator is less precedence, skip ahead
+			# Step 4: "pop op, pop twice from val, apply bop, push result to val"
+			# Pop operator
+			addi $sp, $sp, -4
+			sw $ra, 0($sp)	
+			addi $s3, $s3, -4	# Actually modify tp of op_stack, unlike peek
+			move $a0, $s3
+			la $a1, op_stack
+			jal stack_pop		# If expression is ill-formed, this is where it should error out.
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4
+			move $s4, $v1		# $s4 now contains popped operator
+
+			# Pop second operand	# Similar idea to popping operators, so just reuse comments.
+			addi $sp, $sp, -4
+			sw $ra, 0($sp)
+			addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
+			move $a0, $s2
+			la $a1, val_stack
+			jal stack_pop		# If expression is ill-formed, this is where it should error out.
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4
+			move $s6, $v1		# $s6 now contains popped operand 2
+			
+			# Pop first operand	
+			addi $sp, $sp, -4
+			sw $ra, 0($sp)
+			addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
+			move $a0, $s2
+			la $a1, val_stack
+			jal stack_pop		# If expression is ill-formed, this is where it should error out.
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4
+			move $s5, $v1		# $s5 now contains popped operand 1
+
+			# Apply bop
+			addi $sp, $sp, -4
+			sw $ra, 0($sp)
+			move $a0, $s5
+			move $a1, $s4
+			move $a2, $s6
+			jal apply_bop
 			lw $ra, 0($sp)
 			addi $sp, $sp, 4
 			
-			# Push val to stack
+			# Push newly calculated value to val_stack
 			addi $sp, $sp, -4
 			sw $ra, 0($sp)
-			move $a0, $v0
+			move $a0, $v0		# $v0 contains calculated value from apply_bop
 			move $a1, $s2
 			la $a2, val_stack
 			jal stack_push
 			lw $ra, 0($sp)
 			addi $sp, $sp, 4
-			
-			addi $v1, $v1, -1		# Advance AExp by (n - 1), n being length of val
-			add $s0, $s0, $v1
-			j advanceLoop
-
-		advanceLoop:
-			addi $s0, $s0, 1		# Advance AExp forward by 1 character
-			lbu $s1, 0($s0)		
-			bnez $s1, iterateAExp		# Keep going until null terminator is reached
+			move $s2, $v0		# Update tp of val_stack
+						
+			addi $sp, $sp, -4
+			sw $ra, 0($sp)
+			addi $a0, $s3, -4			# Pass tp - 4 to is_stack_empty
+			jal is_stack_empty
+			lw $ra, 0($sp)
+			addi $sp, $sp, 4		
+			beq $v0, $0, loopThroughOpStack		# Stack is not empty yet
 		
-	moveForward:
+		pushOp:
+		# Push operator onto stack
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		move $a0, $s1			# Reminder that $s1 contains current character
+		move $a1, $s3			# $s3 contains tp of op_stack
+		la $a2, op_stack
+		
+		jal stack_push
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s3, $v0			# Update tp after push
+		
+		j advanceLoop
+
+	leftParensFound:
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		move $a0, $s1
+		move $a1, $s3			# $s3 contains tp of op_stack
+		la $a2, op_stack
+		jal stack_push
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s3, $v0			# Update tp of op_stack
+		
+		j advanceLoop
+
+	rightParensFound:
+		j advanceLoop
+
+	advanceLoop:
+		addi $s0, $s0, 1		# Advance AExp forward by 1 character
+		lbu $s1, 0($s0)		
+		bnez $s1, iterateAExp		# Keep going until null terminator is reached
+		
+	moveForward: # By this point, I can merely pop and re-push result onto stack for the answer.
+		# Check if operator stack is empty
+		finalCalculations:
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		move $a0, $s3
+		jal is_stack_empty
+		lw $ra, 0($sp)
+		bne $v0, $0, returnResult
+		
+		# Pop operator		
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)	
+		addi $s3, $s3, -4	# Actually modify tp of op_stack, unlike peek
+		move $a0, $s3
+		la $a1, op_stack
+		jal stack_pop		# If expression is ill-formed, this is where it should error out.
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s4, $v1		# $s4 now contains popped operator
+	
+		# Pop second operand
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_pop		# If expression is ill-formed, this is where it should error out.
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s6, $v1		# $s6 now contains popped operand 2
+			
+		# Pop first operand	
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_pop		# If expression is ill-formed, this is where it should error out.
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s5, $v1		# $s5 now contains popped operand 1
+			
+		# Apply bop
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		move $a0, $s5
+		move $a1, $s4
+		move $a2, $s6
+		jal apply_bop
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		
+		# Push newly calculated value to val_stack
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		move $a0, $v0		# $v0 contains calculated value from apply_bop
+		move $a1, $s2
+		la $a2, val_stack
+		jal stack_push
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s2, $v0		# Update tp of val_stack
+						
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		addi $a0, $s3, -4			# Pass tp - 4 to is_stack_empty
+		jal is_stack_empty
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4		
+		beq $v0, $0, finalCalculations		# Stack is not empty yet
+	
+		# Pop the final calculated result in val_stack.
+		returnResult:
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		addi $s2, $s2, -4
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_peek
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		move $s0, $v0		# $s0 now contains calculated result.
+		
+		# However, if there are more in val_stack, must be ill-formed expression.
+		addi $sp, $sp, -4
+		sw $ra, 0($sp)
+		addi $a0, $s2, -4		
+		jal is_stack_empty
+		lw $ra, 0($sp)
+		addi $sp, $sp, 4
+		beq $v0, $0, parseError
+		
+		move $a0, $s0
+		li $v0, 1
+		syscall
 		jr $ra
 
 constructOperand: # Helper method for eval, takes the AExp as argument
@@ -170,7 +413,7 @@ stack_pop: # (int tp, int* addr)
 	lw $v1, 0($t0)			# $v0 stays the same, return popped element in $v1
 	jr $ra
 	emptyStackError:
-		j badTokenError
+		j parseError
 
 is_stack_empty: # (int tp)
 	blt $a0, $0, emptyStack
@@ -273,6 +516,8 @@ applyoperror_msg:
 	li $v0, 4
 	la $a0, ApplyOpError
 	syscall
+	la $a0, Newline
+	syscall
 	
 	li $v0, 10
 	syscall
@@ -281,6 +526,18 @@ badTokenError:
 	li $v0, 4
 	la $a0, BadToken
 	syscall
+	la $a0, Newline
+	syscall
 		
+	li $v0, 10
+	syscall
+
+parseError:
+	li $v0, 4
+	la $a0, ParseError
+	syscall
+	la $a0, Newline
+	syscall
+	
 	li $v0, 10
 	syscall
