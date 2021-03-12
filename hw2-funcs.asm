@@ -83,39 +83,11 @@ eval: # (string AExp)
 																				
 			blt $s5, $s4, pushOp	# Operator stack's operator is less precedence, skip ahead
 			# Step 4: "pop op, pop twice from val, apply bop, push result to val"
-			# Pop operator
-			addi $s3, $s3, -4	# Actually modify tp of op_stack, unlike peek
-			move $a0, $s3
-			la $a1, op_stack
-			jal stack_pop		# If expression is ill-formed, this is where it should error out.
-			move $s4, $v1		# $s4 now contains popped operator
-
-			# Pop second operand	# Similar idea to popping operators, so just reuse comments.
-			addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
 			move $a0, $s2
-			la $a1, val_stack
-			jal stack_pop		# If expression is ill-formed, this is where it should error out.
-			move $s6, $v1		# $s6 now contains popped operand 2
-			
-			# Pop first operand	
-			addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
-			move $a0, $s2
-			la $a1, val_stack
-			jal stack_pop		# If expression is ill-formed, this is where it should error out.
-			move $s5, $v1		# $s5 now contains popped operand 1
-
-			# Apply bop
-			move $a0, $s5
-			move $a1, $s4
-			move $a2, $s6
-			jal apply_bop
-			
-			# Push newly calculated value to val_stack
-			move $a0, $v0		# $v0 contains calculated value from apply_bop
-			move $a1, $s2
-			la $a2, val_stack
-			jal stack_push
-			move $s2, $v0		# Update tp of val_stack
+			move $a1, $s3
+			jal calculateAndPushResultToStack
+			move $s2, $v0		# Update tp of val and op_stack via return values
+			move $s3, $v1
 						
 			addi $a0, $s3, -4			# Pass tp - 4 to is_stack_empty
 			jal is_stack_empty		
@@ -148,24 +120,22 @@ eval: # (string AExp)
 		jal stack_pop		
 		move $s6, $v1		
 			
-		# Check if operator stack's next character is left parens, pop parens and skip ahead if so
-		addi $a0, $s3, -4
+		# Pop operator
+		addi $s3, $s3, -4
+		move $a0, $s3
 		la $a1, op_stack
-		jal stack_peek
-		li $t0, '('
-		bne $v0, $t0, performBinop
+		jal stack_pop
+		move $s4, $v1		# Move operator into $s4
 			
+		# Check if popped operator is left parens, skip ahead if so
+		li $t0, '('
+		bne $s4, $t0, performBinop
 		# Is left parens, so push operand... 
 		move $a0, $s6
 		move $a1, $s2
 		la $a2, val_stack
 		jal stack_push
 		move $s2, $v0			# Update tp of val_stack
-		# And pop left parentheses
-		addi $s3, $s3, -4
-		move $a0, $s3
-		la $a1, op_stack
-		jal stack_pop
 		j advanceLoop
 			
 		performBinop:
@@ -175,16 +145,6 @@ eval: # (string AExp)
 		la $a1, val_stack
 		jal stack_pop		
 		move $s5, $v1		
-
-		# Pop operator
-		addi $s3, $s3, -4
-		move $a0, $s3
-		la $a1, op_stack
-		jal stack_pop
-		move $s4, $v1		# Move operator into $s4
-		
-		li $t0, '('
-		beq $s4, $t0, advanceLoop
 
 		# Apply bop
 		move $a0, $s5
@@ -199,7 +159,6 @@ eval: # (string AExp)
 		jal stack_push
 		move $s2, $v0		
 			
-		move $s4, $v1		# Move operator into $s4
 		j rightParensFound	# Don't need a condition - must leave via the beq above.
 
 	advanceLoop:
@@ -207,51 +166,24 @@ eval: # (string AExp)
 		lbu $s1, 0($s0)			
 		bnez $s1, iterateAExp		# Keep going until null terminator is reached
 		
-	moveForward: # By this point, I can merely pop and re-push result onto stack for the answer.
+	finalCalculations: # By this point, I can merely pop and re-push result onto stack for the answer.
 	# Check if operator stack is empty
-	finalCalculations:	
 	addi $a0, $s3, -4
 	jal is_stack_empty		
 	bne $v0, $0, returnResult
 	
-	# Pop operator		
-	addi $s3, $s3, -4	# Actually modify tp of op_stack, unlike peek
-	move $a0, $s3
-	la $a1, op_stack
-	jal stack_pop		# If expression is ill-formed, this is where it should error out.
-	move $s4, $v1		# $s4 now contains popped operator
-
-	# Pop second operand
-	addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
 	move $a0, $s2
-	la $a1, val_stack
-	jal stack_pop		# If expression is ill-formed, this is where it should error out.
-	move $s6, $v1		# $s6 now contains popped operand 2
-		
-	# Pop first operand	
-	addi $s2, $s2, -4	# Actually modify tp of val_stack, unlike peek
-	move $a0, $s2
-	la $a1, val_stack
-	jal stack_pop		# If expression is ill-formed, this is where it should error out.
-	move $s5, $v1		# $s5 now contains popped operand 1
-		
-	# Apply bop
-	move $a0, $s5
-	move $a1, $s4
-	move $a2, $s6
-	jal apply_bop
-	
-	# Push newly calculated value to val_stack
-	move $a0, $v0		# $v0 contains calculated value from apply_bop
-	move $a1, $s2
-	la $a2, val_stack
-	jal stack_push
-	move $s2, $v0		# Update tp of val_stack
+	move $a1, $s3
+	jal calculateAndPushResultToStack
+	move $s2, $v0				# Update tp of val and op_stack via return values
+	move $s3, $v1
 			
 	# If stack is not empty, go back once more		
 	addi $a0, $s3, -4			# Pass tp - 4 to is_stack_empty
 	jal is_stack_empty	
 	beq $v0, $0, finalCalculations		# Stack is not empty yet
+
+	# =====================================================================================
 
 	# Pop the final calculated result in val_stack.
 	returnResult:		
@@ -273,24 +205,76 @@ eval: # (string AExp)
 	addi $sp, $sp, 4
 	jr $ra
 
+calculateAndPushResultToStack:
+	addi $sp, $sp, -24
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)	# Store tp of val_stack
+	sw $s1, 8($sp)  # Store tp of op_stack
+	sw $s2, 12($sp)	# Store operator
+	sw $s3, 16($sp) # Store operand 1
+	sw $s4, 20($sp) # Store operand 2
+	move $s0, $a0
+	move $s1, $a1
+
+	# Pop operator		
+	addi $s1, $s1, -4	# Actually modify tp of op_stack, unlike peek
+	move $a0, $s1
+	la $a1, op_stack
+	jal stack_pop		# If expression is ill-formed, this is where it should error out.
+	move $s2, $v1		# $s2 now contains popped operator
+
+	# Pop second operand
+	addi $s0, $s0, -4	# Actually modify tp of val_stack, unlike peek
+	move $a0, $s0
+	la $a1, val_stack
+	jal stack_pop		# If expression is ill-formed, this is where it should error out.
+	move $s4, $v1		# $s4 now contains popped operand 2
+		
+	# Pop first operand	
+	addi $s0, $s0, -4	# Actually modify tp of val_stack, unlike peek
+	move $a0, $s0
+	la $a1, val_stack
+	jal stack_pop		# If expression is ill-formed, this is where it should error out.
+	move $s3, $v1		# $s3 now contains popped operand 1
+		
+	# Apply bop
+	move $a0, $s3
+	move $a1, $s2
+	move $a2, $s4
+	jal apply_bop
+	
+	# Push newly calculated value to val_stack
+	move $a0, $v0		# $v0 contains calculated value from apply_bop
+	move $a1, $s0
+	la $a2, val_stack
+	jal stack_push
+	move $s0, $v0		# Update tp of val_stack
+	
+	move $v0, $s0	# Return the new tps
+	move $v1, $s1
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)	
+	lw $s1, 8($sp)  
+	lw $s2, 12($sp)	
+	lw $s3, 16($sp)
+	lw $s4, 20($sp) 
+	addi $sp, $sp, 24
+	jr $ra
+
 constructOperand: # Helper method for eval, takes the AExp as argument
 	# First, find length of operand
-	addi $sp, $sp, -16
+	addi $sp, $sp, -12
 	sw $ra, 0($sp)
 	sw $s0, 4($sp)		# Save AExp
 	sw $s1, 8($sp)		# Save length of string
-	sw $s2, 12($sp)		# Save current character
 	
 	move $s0, $a0		# ^
 	li $s1, 0		# ^
 	findLengthLoop:
 		addi $s1, $s1, 1	# Increment length
 		addi $s0, $s0, 1	# Advance AExp string pointer
-		lbu $s2, 0($s0)		# Load next character in AExp
-		
-		move $a0, $s2
+		lbu $a0, 0($s0)		# Load next character in AExp
 		jal is_digit
-		
 		bne $v0, $0, findLengthLoop	# As long as the digits continue being digits, keep going
 		
 	# By this point in the code, length of string is stored in $s1
@@ -300,14 +284,14 @@ constructOperand: # Helper method for eval, takes the AExp as argument
 	li $t3, 0		# To store actual value of all the digits
 	findValueLoop:
 		addi $s0, $s0, -1	# Decrement AExp string pointer
-		lbu $s2, 0($s0)		# Load next character in AExp (but backwards)
-		addi $s2, $s2, -48	# Find actual value of digit
-		mult $s2, $t2		# Multiply it by the appropriate power of 10
+		lbu $t4, 0($s0)		# Load next character in AExp (but backwards)
+		addi $t4, $t4, -48	# Find actual value of digit
+		mult $t4, $t2		# Multiply it by the appropriate power of 10
 		mflo $t4		
 		add $t3, $t3, $t4	# Add to total sum
 		
 		addi $t0, $t0, 1		# Move on to digit left of this one
-		mult $t2, $t1			# $t2 contains power of 10
+		mult $t2, $t1			# Multiply $t2 by 10
 		mflo $t2
 		bne $t0, $s1, findValueLoop	# Once $t0 reaches the length, stop
 	
@@ -315,9 +299,8 @@ constructOperand: # Helper method for eval, takes the AExp as argument
 	move $v1, $s1	# Length of that value
 	lw $ra, 0($sp)
 	lw $s0, 4($sp)	
-	lw $s1, 8($sp)		
-	lw $s2, 12($sp)		
-	addi $sp, $sp, 16
+	lw $s1, 8($sp)			
+	addi $sp, $sp, 12
 	jr $ra	
 	
 # ======================================================================================================
@@ -412,8 +395,7 @@ op_precedence: # (char c)
 	sw $ra, 0($sp)
 	
 	jal valid_ops		# $a0 is already the correct argument for valid_ops
-	li $t0, 1		# Valid operator return value is 1
-	bne $v0, $t0, invalid_op
+	beq $v0, $0, invalid_op
 
 	li $t0, '*'
 	beq $a0, $t0, precedence_2
@@ -450,7 +432,6 @@ apply_bop: # (int v1, char op, int v2)
 	mflo $a0
 	mult $a2, $t0
 	mflo $a2
-	
 	skip_sign_swap:
 		div $a0, $a2
 		mflo $v0			# Get quotient
