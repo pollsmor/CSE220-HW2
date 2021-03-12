@@ -37,11 +37,20 @@ eval: # (string AExp)
 	j badTokenError 		# Character is invalid
 	
 	digitFound:	# Find additional digits (if any), then push to val_stack
+		# Quick optimization: don't call constructOperand if I know this is the only digit.
+		lbu $a0, 1($s0)
+		jal is_digit
+		move $t0, $v0
+		move $v0, $s1		# Use $v0 to conform with use of constructOperand
+		addi $v0, $v0, -48	# Get numerical value of ASCII character
+		beq $t0, $0, operandLength1
+	
 		move $a0, $s0			# constructOperand takes AExp
 		jal constructOperand
 		addi $v1, $v1, -1		# Advance AExp by (n - 1), n being length of returned val
 		add $s0, $s0, $v1
 		
+		operandLength1:
 		# Push val to stack
 		move $a0, $v0
 		move $a1, $s2			# $s2 contains tp of val_stack
@@ -139,7 +148,7 @@ eval: # (string AExp)
 		jal stack_pop		
 		move $s6, $v1		
 			
-		# Check if operator stack's next character is left parens
+		# Check if operator stack's next character is left parens, pop parens and skip ahead if so
 		addi $a0, $s3, -4
 		la $a1, op_stack
 		jal stack_peek
@@ -266,12 +275,11 @@ eval: # (string AExp)
 
 constructOperand: # Helper method for eval, takes the AExp as argument
 	# First, find length of operand
-	addi $sp, $sp, -20
+	addi $sp, $sp, -16
 	sw $ra, 0($sp)
-	sw $s0, 4($sp)		# Need to save $a0 before calling findLengthLoop
-	sw $s1, 8($sp)		# Need to save length of string before calling findLengthLoop
-	sw $s2, 12($sp)		# Need to save current character before calling findLengthLoop
-	sw $s3, 16($sp)		# Need to store actual value of all the digits
+	sw $s0, 4($sp)		# Save AExp
+	sw $s1, 8($sp)		# Save length of string
+	sw $s2, 12($sp)		# Save current character
 	
 	move $s0, $a0		# ^
 	li $s1, 0		# ^
@@ -286,39 +294,30 @@ constructOperand: # Helper method for eval, takes the AExp as argument
 		bne $v0, $0, findLengthLoop	# As long as the digits continue being digits, keep going
 		
 	# By this point in the code, length of string is stored in $s1
-	li $s3, 0		# To store actual value of all the digits
 	li $t0, 0		# findLengthLoop looped right, now loop left
 	li $t1, 10		# Constant 10
+	li $t2, 1		# Multiply this however many times by 10 for each digit
+	li $t3, 0		# To store actual value of all the digits
 	findValueLoop:
 		addi $s0, $s0, -1	# Decrement AExp string pointer
 		lbu $s2, 0($s0)		# Load next character in AExp (but backwards)
-	
-		li $t2, 1	# Multiply this however many times by 10 for each digit
-		move $t3, $t0	# Don't want to modify the amount of times to apply x10 in this next loop
-		exponent10:
-			beq $t3, $0, goOnToNextLoop
-			mult $t2, $t1
-			mflo $t2
-			addi $t3, $t3, -1
-			bne $t3, $0, exponent10
-			
-		goOnToNextLoop:
 		addi $s2, $s2, -48	# Find actual value of digit
 		mult $s2, $t2		# Multiply it by the appropriate power of 10
-		mflo $t2		# $t2 doesn't matter now so store result here
-		add $s3, $s3, $t2	# Add to total sum
+		mflo $t4		
+		add $t3, $t3, $t4	# Add to total sum
 		
 		addi $t0, $t0, 1		# Move on to digit left of this one
+		mult $t2, $t1			# $t2 contains power of 10
+		mflo $t2
 		bne $t0, $s1, findValueLoop	# Once $t0 reaches the length, stop
 	
-	move $v0, $s3	# Actual value
+	move $v0, $t3	# Actual value
 	move $v1, $s1	# Length of that value
 	lw $ra, 0($sp)
 	lw $s0, 4($sp)	
 	lw $s1, 8($sp)		
 	lw $s2, 12($sp)		
-	lw $s3, 16($sp)	# Deallocate
-	addi $sp, $sp, 20
+	addi $sp, $sp, 16
 	jr $ra	
 	
 # ======================================================================================================
