@@ -16,13 +16,14 @@ eval: # (string AExp)
 	li $s3, 0		# Use $s2 as tp argument for op_stack
 
 	iterateAExp:
+	
 	# Check if character is a digit
 	move $a0, $s1		# Make first argument of is_digit the character
 	jal is_digit
 	bne $v0, $0, digitFound
 
 	# Check if character is an operator
-	move $a0, $s1
+	move $a0, $s1	
 	jal valid_ops
 	bne $v0, $0, operatorFound
 	
@@ -54,8 +55,8 @@ eval: # (string AExp)
 	operatorFound: 
 		addi $a0, $s3, -4		# Pass tp - 4 to is_stack_empty
 		jal is_stack_empty
-		bne $v0, $0, pushOp		# If op_stack is empty, simply push to it		
-		loopThroughOpStack:		# Otherwise...				
+		bne $v0, $0, pushOp		# If op_stack is empty, simply push to it					
+		loopThroughOpStack:		# Otherwise...		
 			move $a0, $s1
 			jal op_precedence
 			move $s4, $v0		# $s4 now contains precedence of current character
@@ -63,6 +64,10 @@ eval: # (string AExp)
 			addi $a0, $s3, -4	# Peek at op_stack
 			la $a1, op_stack
 			jal stack_peek
+			
+			# If left parens is on stack, just push to it as well
+			li $t0, '('
+			beq $v0, $t0, pushOp	
 			
 			move $a0, $v0		# $v0 contains the peeked operator
 			jal op_precedence
@@ -124,22 +129,60 @@ eval: # (string AExp)
 		la $a2, op_stack
 		jal stack_push
 		move $s3, $v0			# Update tp of op_stack
-		
+	
 		j advanceLoop
 
 	rightParensFound:
-		j advanceLoop
+		# Pop operator
+		addi $s3, $s3, -4
+		move $a0, $s3
+		la $a1, op_stack
+		jal stack_pop
+		move $s4, $v1		# Move operator into $s4
+		
+		li $t0, '('
+		beq $s4, $t0, advanceLoop
+			
+		# Pop second operand	
+		addi $s2, $s2, -4	
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_pop		
+		move $s6, $v1		
+			
+		# Pop first operand	
+		addi $s2, $s2, -4	
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_pop		
+		move $s5, $v1		
+
+		# Apply bop
+		move $a0, $s5
+		move $a1, $s4
+		move $a2, $s6
+		jal apply_bop
+			
+		# Push newly calculated value to val_stack
+		move $a0, $v0		
+		move $a1, $s2
+		la $a2, val_stack
+		jal stack_push
+		move $s2, $v0		
+			
+		move $s4, $v1		# Move operator into $s4
+		j rightParensFound	# Don't need a condition - must leave via the beq above.
 
 	advanceLoop:
 		addi $s0, $s0, 1		# Advance AExp forward by 1 character
-		lbu $s1, 0($s0)		
+		lbu $s1, 0($s0)			
 		bnez $s1, iterateAExp		# Keep going until null terminator is reached
 		
 	moveForward: # By this point, I can merely pop and re-push result onto stack for the answer.
 		# Check if operator stack is empty
-		finalCalculations:
-		move $a0, $s3
-		jal is_stack_empty
+		finalCalculations:	
+		addi $a0, $s3, -4
+		jal is_stack_empty		
 		bne $v0, $0, returnResult
 		
 		# Pop operator		
@@ -182,12 +225,12 @@ eval: # (string AExp)
 		beq $v0, $0, finalCalculations		# Stack is not empty yet
 	
 		# Pop the final calculated result in val_stack.
-		returnResult:
+		returnResult:		
 		addi $s2, $s2, -4
 		move $a0, $s2
 		la $a1, val_stack
-		jal stack_peek
-		move $s0, $v0		# $s0 now contains calculated result.
+		jal stack_pop
+		move $s0, $v1		# $s0 now contains calculated result.
 		
 		# However, if there are more in val_stack, must be ill-formed expression.
 		addi $a0, $s2, -4		
