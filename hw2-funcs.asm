@@ -132,7 +132,42 @@ eval: # (string AExp)
 	
 		j advanceLoop
 
-	rightParensFound:
+	rightParensFound:	
+		# Pop second operand	
+		addi $s2, $s2, -4	
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_pop		
+		move $s6, $v1		
+			
+		# Check if operator stack's next character is left parens
+		addi $a0, $s3, -4
+		la $a1, op_stack
+		jal stack_peek
+		li $t0, '('
+		bne $v0, $t0, performBinop
+			
+		# Is left parens, so push operand... 
+		move $a0, $s6
+		move $a1, $s2
+		la $a2, val_stack
+		jal stack_push
+		move $s2, $v0			# Update tp of val_stack
+		# And pop left parentheses
+		addi $s3, $s3, -4
+		move $a0, $s3
+		la $a1, op_stack
+		jal stack_pop
+		j advanceLoop
+			
+		performBinop:
+		# Pop first operand	
+		addi $s2, $s2, -4	
+		move $a0, $s2
+		la $a1, val_stack
+		jal stack_pop		
+		move $s5, $v1		
+
 		# Pop operator
 		addi $s3, $s3, -4
 		move $a0, $s3
@@ -142,20 +177,6 @@ eval: # (string AExp)
 		
 		li $t0, '('
 		beq $s4, $t0, advanceLoop
-			
-		# Pop second operand	
-		addi $s2, $s2, -4	
-		move $a0, $s2
-		la $a1, val_stack
-		jal stack_pop		
-		move $s6, $v1		
-			
-		# Pop first operand	
-		addi $s2, $s2, -4	
-		move $a0, $s2
-		la $a1, val_stack
-		jal stack_pop		
-		move $s5, $v1		
 
 		# Apply bop
 		move $a0, $s5
