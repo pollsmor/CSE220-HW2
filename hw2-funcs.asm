@@ -6,14 +6,24 @@
 
 .text
 eval: # (string AExp)
-	# Will be calling functions, save $ra back to main
-	addi $sp, $sp, -4
+	# Preamble
+	addi $sp, $sp, -36
 	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	sw $s3, 16($sp)
+	sw $s4, 20($sp)
+	sw $s5, 24($sp)
+	sw $s6, 28($sp)
+	sw $s7, 32($sp)
 
 	lw $s0, 0($a1)		# Load AExp
 	lbu $s1, 0($s0)		# Load one character from AExp, use $s1 as $t0 would just get overwritten
 	li $s2, 0		# Use $s2 as tp argument for val_stack
 	li $s3, 0		# Use $s3 as tp argument for op_stack
+	la $s4, op_stack	# Use $s4 as op_stack address so I don't have to keep offsetting by 2000
+	addi $s4, $s4, 2000
 
 	iterateAExp:
 	# Check if character is a digit
@@ -67,10 +77,10 @@ eval: # (string AExp)
 		loopThroughOpStack:		# Otherwise...		
 			move $a0, $s1
 			jal op_precedence
-			move $s4, $v0		# $s4 now contains precedence of current character
+			move $s5, $v0		# $s5 now contains precedence of current character
 		
 			addi $a0, $s3, -4	# Peek at op_stack
-			la $a1, op_stack
+			move $a1, $s4		# Address of op_stack + 2000
 			jal stack_peek
 			
 			# If left parens is on stack, just push operand to val_stack as well
@@ -79,12 +89,13 @@ eval: # (string AExp)
 			
 			move $a0, $v0		# $v0 contains the peeked operator from op_stack
 			jal op_precedence
-			move $s5, $v0		# $s5 now contains precedence of the operator on stack		
+			move $s6, $v0		# $s6 now contains precedence of the operator on stack		
 																				
-			blt $s5, $s4, pushOp	# Operator stack's operator is less precedence, skip ahead
+			blt $s6, $s5, pushOp	# Operator stack's operator is less precedence, skip ahead
 			# Step 4: "pop op, pop twice from val, apply bop, push result to val"
 			move $a0, $s2
 			move $a1, $s3
+			move $a2, $s4		# $s4 contains op_stack offset-ed address
 			jal calculateAndPushResultToStack
 			move $s2, $v0		# Update tp of val and op_stack via return values
 			move $s3, $v1
@@ -97,7 +108,7 @@ eval: # (string AExp)
 		# Push operator onto stack
 		move $a0, $s1			# Reminder that $s1 contains current character
 		move $a1, $s3			# $s3 contains tp of op_stack
-		la $a2, op_stack
+		move $a2, $s4
 		jal stack_push
 		move $s3, $v0			# Update tp after push
 		
@@ -106,7 +117,7 @@ eval: # (string AExp)
 	leftParensFound:
 		move $a0, $s1
 		move $a1, $s3			# $s3 contains tp of op_stack
-		la $a2, op_stack
+		move $a2, $s4
 		jal stack_push
 		move $s3, $v0			# Update tp of op_stack
 	
@@ -118,20 +129,20 @@ eval: # (string AExp)
 		move $a0, $s2
 		la $a1, val_stack
 		jal stack_pop		
-		move $s6, $v1		
+		move $s7, $v1		
 			
 		# Pop operator
 		addi $s3, $s3, -4
 		move $a0, $s3
-		la $a1, op_stack
+		move $a1, $s4
 		jal stack_pop
-		move $s4, $v1		# Move operator into $s4
+		move $s5, $v1		# Move operator into $s5
 			
 		# Check if popped operator is left parens, skip ahead if so
 		li $t0, '('
-		bne $s4, $t0, performBinop
+		bne $s5, $t0, performBinop
 		# Is left parens, so push operand... 
-		move $a0, $s6
+		move $a0, $s7
 		move $a1, $s2
 		la $a2, val_stack
 		jal stack_push
@@ -144,12 +155,12 @@ eval: # (string AExp)
 		move $a0, $s2
 		la $a1, val_stack
 		jal stack_pop		
-		move $s5, $v1		
+		move $s6, $v1		
 
 		# Apply bop
-		move $a0, $s5
-		move $a1, $s4
-		move $a2, $s6
+		move $a0, $s6
+		move $a1, $s5
+		move $a2, $s7
 		jal apply_bop
 			
 		# Push newly calculated value to val_stack
@@ -174,6 +185,7 @@ eval: # (string AExp)
 	
 	move $a0, $s2
 	move $a1, $s3
+	move $a2, $s4				# $s4 contains op_stack offset-ed address
 	jal calculateAndPushResultToStack
 	move $s2, $v0				# Update tp of val and op_stack via return values
 	move $s3, $v1
@@ -201,25 +213,36 @@ eval: # (string AExp)
 	move $a0, $s0
 	li $v0, 1
 	syscall
+	# Restore $ra and $s registers
 	lw $ra, 0($sp)
-	addi $sp, $sp, 4
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	lw $s3, 16($sp)
+	lw $s4, 20($sp)
+	lw $s5, 24($sp)
+	lw $s6, 28($sp)	
+	lw $s7, 32($sp)
+	addi $sp, $sp, 36
 	jr $ra
 
 calculateAndPushResultToStack:
-	addi $sp, $sp, -24
+	addi $sp, $sp, -28
 	sw $ra, 0($sp)
 	sw $s0, 4($sp)	# Store tp of val_stack
 	sw $s1, 8($sp)  # Store tp of op_stack
 	sw $s2, 12($sp)	# Store operator
 	sw $s3, 16($sp) # Store operand 1
 	sw $s4, 20($sp) # Store operand 2
+	sw $s5, 24($sp)	# Store offset-ed address of op_stack
 	move $s0, $a0
 	move $s1, $a1
+	move $s5, $a2
 
 	# Pop operator		
 	addi $s1, $s1, -4	# Actually modify tp of op_stack, unlike peek
 	move $a0, $s1
-	la $a1, op_stack
+	move $a1, $s5
 	jal stack_pop		# If expression is ill-formed, this is where it should error out.
 	move $s2, $v1		# $s2 now contains popped operator
 
@@ -258,7 +281,8 @@ calculateAndPushResultToStack:
 	lw $s2, 12($sp)	
 	lw $s3, 16($sp)
 	lw $s4, 20($sp) 
-	addi $sp, $sp, 24
+	lw $s5, 24($sp)
+	addi $sp, $sp, 28
 	jr $ra
 
 constructOperand: # Helper method for eval, takes the AExp as argument
@@ -296,10 +320,10 @@ constructOperand: # Helper method for eval, takes the AExp as argument
 		bne $t0, $s1, findValueLoop	# Once $t0 reaches the length, stop
 	
 	move $v0, $t3	# Actual value
-	move $v1, $s1	# Length of that value
+	move $v1, $s1	# Length of that value	
 	lw $ra, 0($sp)
-	lw $s0, 4($sp)	
-	lw $s1, 8($sp)			
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
 	addi $sp, $sp, 12
 	jr $ra	
 	
@@ -322,12 +346,6 @@ is_digit: # (char c)
   		jr $ra
 
 stack_push: # (int x, int tp, int* addr)
-	la $t0, op_stack
-	bne $t0, $a2, skipOffsetPush	# Check that the base address is op_stack or val_stack
-	# op_stack must be > 2000 bytes higher in address to prevent overlapping with val_stack
-	addi $a2, $a2, 2000		
-
-	skipOffsetPush:
 	li $t0, 2000			# 500 * 4
 	bge $a1, $t0, stackTooLarge	# Stack will pass 500 elements, so error out
 	add $t0, $a2, $a1		# Add tp ($a1) to base address ($a2) and store in $t0
@@ -341,22 +359,13 @@ stack_push: # (int x, int tp, int* addr)
 # Basically a carbon copy of stack_pop's body
 stack_peek: # (int tp, int* addr)
 	blt $a0, $0, emptyStackError 
-	la $t0, op_stack
-	bne $t0, $a1, skipOffsetPeek	# Check that the base address is op_stack or val_stack
-	# op_stack must be > 2000 bytes higher in address to prevent overlapping with val_stack
-	addi $a1, $a1, 2000	
 	
-	skipOffsetPeek:
 	add $t0, $a1, $a0		
 	lw $v0, 0($t0)
 	jr $ra	
 
 stack_pop: # (int tp, int* addr)
 	blt $a0, $0, emptyStackError	# $tp cannot be < 0 (i.e. caller provides -4)
-	la $t0, op_stack
-	bne $t0, $a1, skipOffsetPop	# Check that the base address is op_stack or val_stack
-	# op_stack must be > 2000 bytes higher in address to prevent overlapping with val_stack
-	addi $a1, $a1, 2000	
 	
 	skipOffsetPop:
 	add $t0, $a1, $a0		# Add tp to base address
@@ -464,17 +473,13 @@ applyoperror_msg:
 	li $v0, 4
 	la $a0, ApplyOpError
 	syscall
-	la $a0, Newline
-	syscall
-	
+
 	li $v0, 10
 	syscall
 	
 badTokenError:
 	li $v0, 4
 	la $a0, BadToken
-	syscall
-	la $a0, Newline
 	syscall
 		
 	li $v0, 10
@@ -483,8 +488,6 @@ badTokenError:
 parseError:
 	li $v0, 4
 	la $a0, ParseError
-	syscall
-	la $a0, Newline
 	syscall
 	
 	li $v0, 10
