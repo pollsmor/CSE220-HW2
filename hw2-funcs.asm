@@ -115,6 +115,11 @@ eval: # (string AExp)
 		j advanceLoop
 
 	leftParensFound:
+		# Check case of ()
+		li $t0, ')'
+		lbu $t1, 1($s0)
+		beq $t0, $t1, parseError
+	
 		move $a0, $s1
 		move $a1, $s3			# $s3 contains tp of op_stack
 		move $a2, $s4
@@ -438,9 +443,7 @@ apply_bop: # (int v1, char op, int v2)
 	bgez $a2, skip_sign_swap	# The way I handle floor division requires the second operand to be (+)
 	# Swap signs of first arg to (+), balance it by swapping second arg
 	sub $a0, $0, $a0
-	mflo $a0
 	sub $a2, $0, $a2
-	mflo $a2
 	skip_sign_swap:
 		div $a0, $a2
 		mflo $v0			# Get quotient
