@@ -47,6 +47,8 @@ eval: # (string AExp)
 	j badTokenError 		# Character is invalid
 	
 	digitFound:	# Find additional digits (if any), then push to val_stack
+		li $v1, 1		# Length of string is 1 unless constructOperand condition runs
+	
 		# Quick optimization: don't call constructOperand if I know this is the only digit.
 		lbu $a0, 1($s0)
 		jal is_digit
@@ -61,6 +63,11 @@ eval: # (string AExp)
 		add $s0, $s0, $v1
 		
 		operandLength1:
+		addi $t0, $s0, 1		# Check next element is not a left parens
+		lbu $t1, 0($t0)
+		li $t2, '('
+		beq $t1, $t2, parseError
+		
 		# Push val to stack
 		move $a0, $v0
 		move $a1, $s2			# $s2 contains tp of val_stack
