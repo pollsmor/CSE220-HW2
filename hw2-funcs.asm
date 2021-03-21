@@ -436,10 +436,10 @@ apply_bop: # (int v1, char op, int v2)
 	# Last valid operation is division
 	beq $a2, $0, dividebyzero	# Can't divide by 0
 	bgez $a2, skip_sign_swap	# The way I handle floor division requires the second operand to be (+)
-	li $t0, -1			# Swap signs of first arg to (+), balance it by swapping second arg
-	mult $a0, $t0
+	# Swap signs of first arg to (+), balance it by swapping second arg
+	sub $a0, $0, $a0
 	mflo $a0
-	mult $a2, $t0
+	sub $a2, $0, $a2
 	mflo $a2
 	skip_sign_swap:
 		div $a0, $a2
@@ -454,10 +454,7 @@ apply_bop: # (int v1, char op, int v2)
 		add $v0, $a0, $a2
 		j return_bop_result
 	subtraction:
-		li $t0, -1		# Flip sign to add a negative number
-		mult $a2, $t0
-		mflo $a2
-		add $v0, $a0, $a2
+		sub $v0, $a0, $a2
 		j return_bop_result
 	multiplication:
 		mult $a0, $a2
